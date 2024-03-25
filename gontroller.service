@@ -1,0 +1,12 @@
+[Unit]
+Description=a go built pc controller
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/makeavoy/go/bin/gontroller
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
