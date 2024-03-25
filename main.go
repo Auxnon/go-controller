@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -8,13 +9,17 @@ import (
 	"os/exec"
 )
 
+const (
+	PORT = "7070"
+)
+
 func main() {
-	fmt.Println("Gontroller Active")
+	fmt.Println("Gontroller Active on port " + PORT)
 
 	http.HandleFunc("/r", restart)
 	http.HandleFunc("/s", shutdown)
 	http.HandleFunc("/d", display_restart)
-	err := http.ListenAndServe(":3333", nil)
+	err := http.ListenAndServe(":"+PORT, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -22,15 +27,16 @@ func main() {
 }
 
 func restart(w http.ResponseWriter, r *http.Request) {
-	exec_respond(w, r, "shutdown -r -t 3")
+	exec_respond(w, r, "/bin/sh", "-c", "sleep 5; shutdown -r now")
+	//exec_respond(w, r, "shutdown --help")
 }
 
 func shutdown(w http.ResponseWriter, r *http.Request) {
-	exec_respond(w, r, "shutdown -s -t 3")
+	exec_respond(w, r, "/bin/sh", "-c", `"sleep 5; shutdown now"`)
 }
 
 func display_restart(w http.ResponseWriter, r *http.Request) {
-	exec_respond(w, r, "systemctl restart display-manager")
+	exec_respond(w, r, "systemctl", "restart", "display-manager")
 }
 
 //func getHello(w http.ResponseWriter, r *http.Request) {
@@ -39,10 +45,10 @@ func display_restart(w http.ResponseWriter, r *http.Request) {
 //	// popup()
 //}
 
-func exec_respond(w http.ResponseWriter, r *http.Request, s string) {
-	out := execute(s)
+func exec_respond(w http.ResponseWriter, r *http.Request, s string, args ...string) {
+	out := execute(s, args...)
 	fmt.Println(out)
-	io.WriteString(w, out)
+	io.WriteString(w, "success: "+out)
 }
 
 func wexecute(s string) {
@@ -53,13 +59,24 @@ func wexecute(s string) {
 	}
 }
 
-func execute(s string) string {
-	out, err := exec.Command(s).Output()
+func execute(s string, args ...string) string {
+	cmd := exec.Command(s, args...)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+
 	if err != nil {
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		return "failed"
 	}
-	output := string(out)
-	return output
+
+	fmt.Println("Exec Result: " + out.String() + " (" + stderr.String() + ")")
+
+	return out.String()
+
 }
 
 /* func popup() {
