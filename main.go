@@ -9,22 +9,60 @@ import (
 )
 
 func main() {
-	fmt.Println("Hello, world.")
+	fmt.Println("Gontroller Active")
 
-	http.HandleFunc("/hello", getHello)
+	http.HandleFunc("/r", restart)
+	http.HandleFunc("/s", shutdown)
+	http.HandleFunc("/d", display_restart)
 	err := http.ListenAndServe(":3333", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Done")
+}
+
+func restart(w http.ResponseWriter, r *http.Request) {
+	exec_respond(w, r, "shutdown -r -t 3")
+}
+
+func shutdown(w http.ResponseWriter, r *http.Request) {
+	exec_respond(w, r, "shutdown -s -t 3")
+}
+
+func display_restart(w http.ResponseWriter, r *http.Request) {
+	exec_respond(w, r, "systemctl restart display-manager")
+}
+
+//func getHello(w http.ResponseWriter, r *http.Request) {
+//	fmt.Printf("got /hello request\n")
+//	io.WriteString(w, "Hello, HTTP!\n")
+//	// popup()
+//}
+
+func exec_respond(w http.ResponseWriter, r *http.Request, s string) {
+	out := execute(s)
+	fmt.Println(out)
+	io.WriteString(w, out)
+}
+
+func wexecute(s string) {
+	command := s
+	err := exec.Command("powershell", "-NoProfile", command).Run()
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func getHello(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("got /hello request\n")
-	io.WriteString(w, "Hello, HTTP!\n")
-	popup()
+func execute(s string) string {
+	out, err := exec.Command(s).Output()
+	if err != nil {
+		return "failed"
+	}
+	output := string(out)
+	return output
 }
 
-func popup() {
+/* func popup() {
 	command := `
 	Add-Type -AssemblyName PresentationCore,PresentationFramework
 	$ButtonType = [System.Windows.MessageBoxButton]::YesNoCancel
@@ -38,4 +76,4 @@ func popup() {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
+}*/
