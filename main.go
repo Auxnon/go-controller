@@ -2,16 +2,22 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os/exec"
+	"strings"
 )
 
 const (
 	PORT = "7070"
 )
+
+type Response struct {
+	Message string `json:"message,omitempty"`
+	Success bool   `json:"success,omitempty"`
+}
 
 func main() {
 	fmt.Println("Gontroller Active on port " + PORT)
@@ -19,6 +25,7 @@ func main() {
 	http.HandleFunc("/r", restart)
 	http.HandleFunc("/s", shutdown)
 	http.HandleFunc("/d", display_restart)
+	http.HandleFunc("/h", get_hostname)
 	err := http.ListenAndServe(":"+PORT, nil)
 	if err != nil {
 		log.Fatal(err)
@@ -27,28 +34,20 @@ func main() {
 }
 
 func restart(w http.ResponseWriter, r *http.Request) {
-	exec_respond(w, r, "/bin/sh", "-c", "sleep 5; shutdown -r now")
+	execute(w, "/bin/sh", "-c", "sleep 5; shutdown -r now")
 	//exec_respond(w, r, "shutdown --help")
 }
 
 func shutdown(w http.ResponseWriter, r *http.Request) {
-	exec_respond(w, r, "/bin/sh", "-c", `"sleep 5; shutdown now"`)
+	execute(w, "/bin/sh", "-c", `"sleep 5; shutdown now"`)
 }
 
 func display_restart(w http.ResponseWriter, r *http.Request) {
-	exec_respond(w, r, "systemctl", "restart", "display-manager")
+	execute(w, "systemctl", "restart", "display-manager")
 }
 
-//func getHello(w http.ResponseWriter, r *http.Request) {
-//	fmt.Printf("got /hello request\n")
-//	io.WriteString(w, "Hello, HTTP!\n")
-//	// popup()
-//}
-
-func exec_respond(w http.ResponseWriter, r *http.Request, s string, args ...string) {
-	out := execute(s, args...)
-	fmt.Println(out)
-	io.WriteString(w, "success: "+out)
+func get_hostname(w http.ResponseWriter, r *http.Request) {
+	execute(w, "hostname")
 }
 
 func wexecute(s string) {
@@ -59,7 +58,7 @@ func wexecute(s string) {
 	}
 }
 
-func execute(s string, args ...string) string {
+func execute(w http.ResponseWriter, s string, args ...string) {
 	cmd := exec.Command(s, args...)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -67,15 +66,18 @@ func execute(s string, args ...string) string {
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
-
-	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
-		return "failed"
+	w.Header().Set("Content-Type", "application/json")
+	response := Response{}
+	response.Success = err == nil
+	if !response.Success {
+		w.WriteHeader(http.StatusInternalServerError)
+		response.Message =
+			strings.TrimSpace(fmt.Sprint(err) + ": " + stderr.String())
+	} else {
+		response.Message = strings.TrimSpace(out.String())
 	}
-
-	fmt.Println("Exec Result: " + out.String() + " (" + stderr.String() + ")")
-
-	return out.String()
+	fmt.Println(response.Message)
+	json.NewEncoder(w).Encode(response)
 
 }
 
